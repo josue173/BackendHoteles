@@ -1,2 +1,2 @@
 # angularHoteles
-Frontend de Gestión de hoteles
+Backend de Gestión de hoteles
