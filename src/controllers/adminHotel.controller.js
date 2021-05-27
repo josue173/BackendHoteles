@@ -6,6 +6,7 @@ const Eventos = require("../models/eventos.model");
 const Servicios = require("../models/servicios.model");
 const Reservaciones = require("../models/reservaciones.model");
 const Usuarios = require("../models/usuarios.model");
+const Factura = require("../models/factura.model");
 const e = require("cors");
 
 var habitacionesModel = new Habitaciones();
@@ -407,82 +408,105 @@ function verHospedajes(req, res) {
   }
 }
 
-function crearFactura(req, res) {
+function facturar(req, res) {
+  let idReservacion = req.params.idReservacion;
+  var facturaModel = new Factura();
   if (req.usuarios.rol == "AministradorHotel") {
-    let idReservacion = req.params.idReservacion;
-    var facturaModel = new Factura();
     Factura.findOne(
-      { idReservacion: idReservacion },
+      { reservacion: idReservacion },
       (err, facturaEncontrada) => {
         if (!facturaEncontrada) {
-          Reservacion.findById(idReservacion, (err, reservacionEncontrada) => {
-            Hotel.findOne(
-              { "habitaciones._id": reservacionEncontrada.idHabitacion },
-              (err, hotelEncontrado) => {
-                Hotel.findByIdAndUpdate(
-                  hotelEncontrado._id,
-                  { $inc: { popularidad: 1 } },
-                  (err, hotelActualizado) => {
-                    console.log(hotelActualizado);
-
-                    Servicio.find(
-                      { idHotel: hotelEncontrado._id },
-                      (err, serviciosEncontrados) => {
-                        var total = 0;
-
-                        for (
-                          let i = 0;
-                          i < hotelEncontrado.habitaciones.length;
-                          i++
-                        ) {
-                          if (
-                            reservacionEncontrada.idHabitacion.equals(
-                              hotelEncontrado.habitaciones[i]._id
-                            )
-                          ) {
-                            total += hotelEncontrado.habitaciones[i].precio;
-                          }
-                        }
-
-                        for (let i = 0; i < serviciosEncontrados.length; i++) {
-                          total += serviciosEncontrados[i].subtotal;
-                          //facturaModel.serviciosHotel.idServicio = serviciosEncontrados[i]._id;
-                          facturaModel.serviciosHotel.push(
-                            serviciosEncontrados[i]._id
-                          );
-                        }
-
-                        facturaModel.fecha_llegada =
-                          reservacionEncontrada.fecha_llegada;
-                        facturaModel.fecha_salida =
-                          reservacionEncontrada.fecha_salida;
-                        facturaModel.idHabitacion =
-                          reservacionEncontrada.idHabitacion;
-                        facturaModel.idUsuario =
-                          reservacionEncontrada.idUsuario;
-                        facturaModel.idReservacion = idReservacion;
-                        facturaModel.total = total;
-
-                        facturaModel.save((err, facturaGuardada) => {
+          // facturaModel.reservacion = facturaEncontrada._id;
+          Reservaciones.findById(
+            idReservacion,
+            (err, reservacionEncontrada) => {
+              if (err)
+                return res.status(500).send({ mensaje: "Error interno" });
+              if (reservacionEncontrada) {
+                facturaModel.reservacion = reservacionEncontrada._id;
+                facturaModel.usuario = reservacionEncontrada.usuario;
+                facturaModel.fechaInicio = reservacionEncontrada.fechaInicio;
+                facturaModel.fechaFin = reservacionEncontrada.fechaFin;
+                Habitaciones.findById(
+                  { _id: reservacionEncontrada.habitacion },
+                  (err, habitacionEncontrada) => {
+                    if (err)
+                      return res.status(500).send({ mensaje: "Error interno" });
+                    if (habitacionEncontrada) {
+                      facturaModel.habitacion = habitacionEncontrada._id;
+                      facturaModel.total = habitacionEncontrada.precio;
+                      Hoteles.findById(
+                        habitacionEncontrada.hotel,
+                        (err, hotelEncontrado) => {
                           if (err)
                             return res
                               .status(500)
-                              .send({ mensaje: "Error en la petición", err });
+                              .send({ mensaje: "Error interno" });
+                          if (hotelEncontrado) {
+                            Servicios.find(
+                              { hotel: hotelEncontrado._id },
+                              (err, serviciosEncontrados) => {
+                                if (err)
+                                  return res
+                                    .status(500)
+                                    .send({ mensaje: "Error interno" });
+                                if (serviciosEncontrados) {
+                                  var servicios;
+                                  for (
+                                    let i = 0;
+                                    i < serviciosEncontrados.length;
+                                    i++
+                                  ) {
+                                    servicios = serviciosEncontrados[i]._id;
+                                    facturaModel.servicios.push(
+                                      serviciosEncontrados[i]._id
+                                    );
+                                    facturaModel.save(
+                                      (err, facturaGuardada) => {
+                                        if (err)
+                                          return res.status(500).send({
+                                            mensaje: "Error en la petición",
+                                            err,
+                                          });
 
-                          if (!facturaGuardada)
+                                        if (!facturaGuardada)
+                                          return res.status(500).send({
+                                            mensaje:
+                                              "Error al guardar la factura",
+                                          });
+
+                                        return res
+                                          .status(200)
+                                          .send({ facturaGuardada });
+                                      }
+                                    );
+                                  }
+                                } else {
+                                  return res
+                                    .status(500)
+                                    .send({ mensaje: "No hay servicios" });
+                                }
+                              }
+                            );
+                          } else {
                             return res
                               .status(500)
-                              .send({ mensaje: "Error al guardar la factura" });
-
-                          return res.status(200).send({ facturaGuardada });
-                        });
-                      }
-                    );
+                              .send({ mensaje: "No hay hotel" });
+                          }
+                        }
+                      );
+                    } else {
+                      return res
+                        .status(500)
+                        .send({ mensaje: "No se encontro la habitacion" });
+                    }
                   }
                 );
+              } else {
+                return res.status(500).send({ mensaje: "Error interno" });
               }
-            );
-          });
+            }
+          );
         } else {
           return res
             .status(500)
@@ -503,4 +527,5 @@ module.exports = {
   verReservaciones,
   buscarHospedajes,
   verHospedajes,
+  facturar,
 };

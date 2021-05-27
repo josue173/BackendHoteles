@@ -11,6 +11,7 @@ var facturasSchema = Schema({
   fechaFin: String,
   habitacion: { type: Schema.Types.ObjectId, ref: "habitaciones" },
   total: Number,
+  servicios: [{ type: Schema.Types.ObjectId, ref: "servicios" }],
 });
 
 module.exports = mongoose.model("facturas", facturasSchema);

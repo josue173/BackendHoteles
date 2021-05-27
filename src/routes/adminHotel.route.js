@@ -50,6 +50,11 @@ hoteles.get(
   "/verHospedajes",
   verification.ensureAuth,
   adminHotelController.verHospedajes
-)
+);
+hoteles.post(
+  "/facturar/:idReservacion",
+  verification.ensureAuth,
+  adminHotelController.facturar
+);
 
 module.exports = hoteles;
